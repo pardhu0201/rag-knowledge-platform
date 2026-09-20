@@ -1,0 +1,91 @@
+Third-Party Vendor Security Assessment - Brightline Payments Inc.
+
+Assessment Date: April 2026
+Conducted by: Vendor Risk Management, Information Security
+Classification: Confidential
+
+Scope
+
+This assessment covers Brightline Payments Inc., engaged as a payment
+processing subprocessor for the checkout service. The review covers
+Brightline's SOC 2 Type II report (period ending December 2025), a
+questionnaire response, and a follow-up technical interview with
+Brightline's security team conducted on April 14, 2026.
+
+Summary Rating
+
+Brightline receives an overall rating of Low-Medium Risk, with one finding
+rated Medium and no findings rated High or Critical. The vendor is approved
+for continued use, contingent on remediation of the Medium finding within
+90 days per section 6.
+
+Data Handled
+
+Brightline processes cardholder data (PAN, expiry, CVV at time of
+transaction only, not retained) and transaction metadata including
+purchase amount, merchant category code, and a tokenised customer
+identifier. Brightline does not receive customer names, addresses, or
+email addresses; these remain within our own systems and are matched to
+the tokenised identifier only on our side.
+
+Certifications and Compliance
+
+Brightline holds a current PCI DSS Level 1 certification, the highest
+tier, appropriate given transaction volume above 6 million per year. The
+SOC 2 Type II report covers the Security and Availability trust service
+criteria with no exceptions noted by the auditor. Brightline is not
+currently certified against ISO 27001, which is noted as an observation
+but not a finding, since PCI DSS Level 1 provides substantially overlapping
+control coverage for the services in scope.
+
+Findings
+
+Finding 1 (Medium): Brightline's incident notification commitment in the
+current contract is 72 hours from confirmed breach, whereas our vendor
+security standard requires 24 hours for any vendor handling cardholder
+data. Brightline's security team confirmed in the technical interview that
+72 hours is their standard SLA but indicated willingness to negotiate a
+24-hour commitment for our specific contract given our transaction volume.
+Remediation: Legal to renegotiate the notification clause within 90 days
+of this assessment; if not achieved, the account team must escalate to the
+CISO for a risk-acceptance decision before contract renewal.
+
+Finding 2 (Low): Brightline's questionnaire response indicated that
+production database backups are encrypted with AES-256 but did not specify
+whether backup encryption keys are rotated on a defined schedule. The
+technical interview clarified that keys are rotated annually via a managed
+KMS, which is acceptable, but this detail should be added to Brightline's
+next questionnaire response to avoid re-raising this as an open question in
+future assessments.
+
+Encryption and Key Management
+
+Data in transit uses TLS 1.2 or higher for all API connections; TLS 1.0 and
+1.1 are disabled at the load balancer. Data at rest is encrypted with
+AES-256 using a managed key service; Brightline does not have access to
+raw unencrypted card data outside of the tokenisation service boundary,
+which runs in a segmented network zone with restricted access logged and
+reviewed monthly.
+
+Access Control
+
+Brightline enforces multi-factor authentication for all administrative
+access to production systems and maintains a documented least-privilege
+access model reviewed quarterly. Privileged access to the tokenisation
+service specifically requires a second approver and is time-boxed to 8
+hours per grant, consistent with our own vendor access standard.
+
+Business Continuity
+
+Brightline maintains an active-active architecture across two AWS regions
+with an documented RTO of 15 minutes and RPO of 5 minutes. The most recent
+disaster recovery test was conducted in February 2026 and met both
+objectives; the test report was provided as part of this assessment and is
+retained in the vendor risk system.
+
+Recommendation
+
+Continue use of Brightline as a payment processing subprocessor, subject to
+tracking Finding 1 to closure within 90 days. Re-assessment is scheduled
+for April 2027, or earlier if Brightline reports a material change to its
+environment, a new subprocessor, or a security incident affecting our data.

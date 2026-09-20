@@ -1,0 +1,82 @@
+Meridian Analytics - Q2 2026 Revenue Report
+
+Prepared by Finance & Strategy
+Distribution: Board of Directors, Executive Leadership
+
+Executive Summary
+
+Meridian Analytics closed Q2 2026 with total revenue of $18.4 million,
+representing 22% year-over-year growth and a 6% increase over Q1 2026. Net
+revenue retention reached 128%, up from 119% in the prior quarter, driven
+primarily by expansion within the enterprise segment. Gross margin held
+steady at 74%, in line with the twelve-month trailing average.
+
+Revenue by Segment
+
+The Enterprise segment contributed $11.2 million, or 61% of total revenue,
+growing 31% year-over-year. The Mid-Market segment contributed $5.1 million,
+growing 14% year-over-year. The Self-Serve segment contributed $2.1 million,
+essentially flat versus Q1, reflecting the planned sunset of the legacy
+pricing tier announced in March.
+
+Annual recurring revenue (ARR) exited the quarter at $71.6 million, up from
+$65.9 million at the end of Q1. New ARR bookings totalled $8.9 million, of
+which $6.2 million came from new logos and $2.7 million from expansion
+within the existing customer base. Churned ARR was $2.3 million, yielding a
+gross revenue retention rate of 94%.
+
+Regional Performance
+
+North America remained the largest region at 58% of total revenue, growing
+19% year-over-year. EMEA grew 27% year-over-year to reach 29% of total
+revenue, its fastest growth rate in six quarters, attributed to the London
+and Berlin enterprise sales teams reaching full ramp. APAC grew 34%
+year-over-year off a smaller base, now representing 13% of total revenue.
+
+Customer Metrics
+
+The company ended the quarter with 1,847 paying customers, up from 1,791 at
+the end of Q1. The number of customers with an annual contract value above
+$100,000 grew from 212 to 241. Average contract value across the enterprise
+segment increased to $186,000, up from $171,000 in Q1, driven by increased
+attach rates on the analytics add-on module, which now sits at 44% attach
+among enterprise accounts, up from 37%.
+
+Cost Structure and Profitability
+
+Total operating expenses were $16.1 million, of which $7.4 million was
+sales and marketing, $5.2 million was research and development, and $3.5
+million was general and administrative. Operating margin improved to
+negative 9%, compared to negative 15% in Q1, continuing the path toward the
+board-approved target of profitability by Q4 2026. Free cash flow was
+negative $1.1 million, an improvement of $2.4 million versus the prior
+quarter.
+
+Sales Efficiency
+
+The magic number, calculated as net new ARR in the quarter divided by prior
+quarter sales and marketing spend, was 0.83, up from 0.71 in Q1. Customer
+acquisition cost payback period improved to 14 months from 17 months,
+reflecting both improved close rates and a higher average contract value.
+
+Outlook for Q3 2026
+
+Management guided to Q3 2026 revenue of $19.6 million to $20.1 million,
+implying year-over-year growth of 20% to 23%. The guidance assumes no
+material change in the macroeconomic environment and reflects the planned
+general availability launch of the forecasting module in early August,
+which is expected to lift attach rates in the mid-market segment
+specifically. The board has approved an incremental $1.5 million in sales
+headcount investment for the second half of the year, concentrated in the
+EMEA region given its outsized growth this quarter.
+
+Risks and Considerations
+
+The self-serve segment's flat growth bears monitoring; if the legacy tier
+sunset does not convert as many accounts to the new pricing structure as
+modelled, self-serve revenue could decline in Q3 rather than stabilise.
+Foreign exchange movements, particularly a strengthening dollar against the
+euro, reduced reported EMEA revenue by an estimated $340,000 relative to
+constant currency. A prolonged strengthening of the dollar would continue to
+create a modest headwind to reported international revenue in future
+quarters.

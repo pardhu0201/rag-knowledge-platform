@@ -1,0 +1,98 @@
+Project Atlas - Technical Design Specification
+
+Version 3.2
+Owner: Platform Engineering
+Status: Approved for implementation
+
+1. Purpose
+
+Project Atlas replaces the current batch ETL pipeline, which runs every six
+hours, with a streaming ingestion architecture capable of end-to-end
+latency under 90 seconds from event generation to queryability in the
+analytics warehouse. This document specifies the target architecture, the
+migration plan, and the operational requirements for the on-call team.
+
+2. Current State and Motivation
+
+The existing pipeline reads from a PostgreSQL replica every six hours, does
+a full transform in a single Spark job, and writes to the warehouse. Median
+job duration is 47 minutes, and a failed run delays all downstream
+dashboards until the next scheduled run. Three customer-facing incidents in
+the last two quarters were caused by stale data resulting from a failed
+batch run going unnoticed for multiple hours. The business requirement is
+near-real-time data for the fraud-detection model, which currently operates
+on data that can be up to six hours stale.
+
+3. Target Architecture
+
+Events are published to a Kafka topic (`atlas.events.v2`) by application
+services at the point of occurrence, using the existing event schema
+registry. A Flink job consumes the topic, performs the transform previously
+done in the batch Spark job, and writes results to two destinations: the
+analytics warehouse (via a Kafka Connect sink, exactly-once semantics) and a
+Redis-backed feature store used directly by the fraud-detection model for
+low-latency lookups.
+
+The Kafka topic is partitioned by customer ID with 48 partitions, chosen to
+allow headroom for 4x current peak throughput without repartitioning. Each
+partition is configured with a retention period of 7 days, which allows a
+full backfill from Kafka alone in the event the warehouse needs to be
+rebuilt, without depending on the source PostgreSQL replica.
+
+4. Latency Budget
+
+The end-to-end 90-second latency target is broken down as follows: event
+publish to Kafka, under 500ms; Flink processing including any necessary
+joins against the dimension tables cached in Flink state, under 30 seconds
+at the 95th percentile; Kafka Connect sink to warehouse, under 60 seconds at
+the 95th percentile including the warehouse's own commit latency. The
+remaining budget is reserved for network and scheduling jitter.
+
+5. Migration Plan
+
+Migration proceeds in three phases. Phase 1 (weeks 1-3) stands up the Kafka
+topic and Flink job in shadow mode, writing to a parallel staging schema in
+the warehouse without affecting production dashboards, to validate
+correctness against the existing batch pipeline's output. Phase 2 (weeks
+4-5) cuts over the fraud-detection model to read from the new Redis feature
+store while the warehouse still receives data from the batch pipeline, to
+de-risk the two migrations independently. Phase 3 (week 6) cuts the
+warehouse over to the streaming sink and decommissions the batch Spark job,
+with the batch job kept in a disabled-but-deployable state for 30 days as a
+rollback path.
+
+6. Operational Requirements
+
+The Flink job must be deployed with at least 2 task-manager replicas for
+availability; a single replica is explicitly out of scope for production.
+Checkpointing is configured at a 60-second interval to Google Cloud Storage,
+which bounds reprocessing on a task-manager failure to at most 60 seconds
+of events. On-call is paged if consumer lag on any partition of
+`atlas.events.v2` exceeds 100,000 messages, or if end-to-end latency
+measured by the synthetic canary event exceeds 90 seconds for more than 5
+consecutive minutes.
+
+7. Data Quality and Schema Evolution
+
+All event schemas are registered in the existing Confluent Schema Registry
+under backward-compatible evolution rules; a breaking schema change requires
+a new topic version (`atlas.events.v3`) rather than an in-place change, and
+both versions must be supported by the Flink job for a minimum 60-day
+overlap period to give producer teams time to migrate.
+
+8. Cost Estimate
+
+The streaming architecture is estimated to cost $14,200 per month in
+additional infrastructure (Kafka cluster, Flink task managers, Redis feature
+store), against a current batch pipeline cost of $3,100 per month. This
+$11,100 monthly increase was approved by finance given the fraud-model
+latency improvement is projected to reduce fraud losses by approximately
+$40,000 per month based on the backtesting results in the companion
+data-science memo.
+
+9. Open Questions
+
+The team has not yet finalised whether the Redis feature store should be a
+managed service (Elasticache) or self-hosted on the existing Kubernetes
+cluster; a decision is expected by the end of week 2 of Phase 1, informed by
+the shadow-mode load testing.

@@ -1,0 +1,25 @@
+# Local run, identical to the production container.
+#
+#   docker compose up --build        ->  http://localhost:7860
+#
+# There is no separate database service - SQLite (metadata) and FAISS (the
+# vector index) both live on disk inside the container, mounted to a local
+# volume so state survives a `docker compose down` / `up` cycle.
+
+services:
+  app:
+    build: .
+    ports:
+      - "7860:7860"
+    environment:
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      ANTHROPIC_MODEL: ${ANTHROPIC_MODEL:-claude-opus-5}
+      EMBEDDING_PROVIDER: ${EMBEDDING_PROVIDER:-hashing}
+      RERANK_PROVIDER: ${RERANK_PROVIDER:-heuristic}
+      SEED_ON_STARTUP: "true"
+      LOG_LEVEL: INFO
+    volumes:
+      - rag_data:/app/backend/data
+
+volumes:
+  rag_data:

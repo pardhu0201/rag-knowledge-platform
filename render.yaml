@@ -1,0 +1,31 @@
+# Render blueprint - one free Docker web service, SQLite + FAISS on disk.
+#
+# Deploy: click the "Deploy to Render" button in the README, or in the Render
+# dashboard choose New > Blueprint and point it at this repo - it reads this
+# file automatically since it lives at the repo root.
+#
+# No managed database: Render's free Postgres now expires 30 days after
+# creation, and this project's vector index is FAISS-on-disk anyway (no
+# Postgres/pgvector dependency at all), so SQLite is the natural, permanent
+# free choice - nothing here expires.
+#
+# Render's free web services sleep after 15 minutes of inactivity and take
+# roughly 50 seconds to wake on the next request - expected for a free-tier
+# portfolio demo, not a bug.
+
+services:
+  - type: web
+    name: rag-knowledge-platform
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /api/health
+    envVars:
+      - key: PORT
+        value: "10000"
+      - key: APP_ENV
+        value: production
+      - key: SEED_ON_STARTUP
+        value: "true"
+      - key: ANTHROPIC_API_KEY
+        sync: false

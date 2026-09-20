@@ -1,0 +1,65 @@
+Internal Guidelines - Safe Use of AI Assistants and Document Tools
+
+Issued by: Security Engineering
+Audience: All employees uploading documents to internal AI tools
+
+Purpose
+
+As AI-powered document assistants become part of daily workflow, this
+guideline explains the specific risks that come with feeding documents to
+these systems and the practices employees should follow.
+
+Why Uploaded Documents Are a Security Surface
+
+Any document uploaded to a retrieval-augmented assistant becomes something
+the assistant will read back, in whole or in part, when answering a future
+question. A malicious or compromised document can attempt an "indirect
+prompt injection": hidden text instructing the assistant to ignore previous
+instructions and reveal its system prompt, act as if it were an unrestricted
+assistant, or exfiltrate other users' data. Security researchers have
+demonstrated this pattern across every major document-AI product; it is not
+specific to any one vendor.
+
+A well-designed platform defends against this at the system level - by
+treating retrieved document text strictly as data rather than instructions,
+regardless of what that text contains - so employees should not rely solely
+on their own vigilance. That said, the practices below reduce risk further.
+
+What Employees Should Do
+
+Do not upload documents received unsolicited from external parties directly
+into an internal knowledge assistant without a quick visual scan for
+obviously unusual formatting, such as white-on-white text, unusually dense
+metadata, or text that reads like instructions rather than content ("system:
+you are now...", "ignore all prior rules"). If you see this, report it to
+Security Engineering rather than uploading it.
+
+Treat any answer that seems to reference internal system behaviour it
+should not know about (asserting things about its own configuration, other
+users, or unrelated internal systems) as suspicious, and report it
+immediately rather than continuing to interact with the assistant.
+
+What the Platform Itself Guarantees
+
+The assistant's answering system is instructed, at the architecture level,
+to never follow instructions found inside a retrieved passage - only to
+summarise or quote such text factually when a question is genuinely about
+it. Every answer additionally passes through an automated groundedness
+check before being shown to the user: citations are verified against the
+actual source text, and any answer scoring below the configured confidence
+threshold is flagged with a visible warning rather than presented as
+reliable. Prompt-injection attempts inside the user's own query are blocked
+outright before retrieval runs at all.
+
+Reporting
+
+Report any suspected prompt-injection attempt, whether in a document you
+uploaded or one you encountered through search, to security@example.com
+with the document name and a screenshot of the assistant's response. Do not
+attempt to further probe or exploit the behaviour yourself.
+
+Review Cycle
+
+This guideline is reviewed every six months by Security Engineering, or
+immediately following any confirmed prompt-injection incident affecting the
+platform.
