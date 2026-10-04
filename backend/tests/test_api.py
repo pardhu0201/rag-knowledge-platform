@@ -99,3 +99,64 @@ def test_dashboard_reflects_logged_queries(client):
     assert isinstance(body["flag_counts"], dict)
     assert body["recent_queries"]
     assert body["total_estimated_cost_usd"] == 0.0  # demo mode is free
+
+
+def test_legitimate_question_with_trigger_words_is_answered(client):
+    body = client.post(
+        "/api/query", json={"query": "What are the instructions for deploying Project Atlas?"}
+    ).json()
+    assert body["blocked"] is False
+    assert body["citations"]
+
+
+def test_same_filename_different_content_conflicts_unless_replaced(client):
+    first = b"Team Alpha budget for 2027 is 1.2 million dollars approved by finance."
+    second = b"Team Beta budget for 2027 is 4.8 million dollars approved by the board."
+
+    created = client.post(
+        "/api/documents/upload", files={"file": ("collide.txt", first, "text/plain")}
+    )
+    assert created.status_code == 200
+    doc_id = created.json()["document_id"]
+
+    # Identical content is a no-op...
+    same = client.post(
+        "/api/documents/upload", files={"file": ("collide.txt", first, "text/plain")}
+    )
+    assert same.json()["status"] == "unchanged"
+
+    # ...different content under the same name must not silently overwrite it.
+    clash = client.post(
+        "/api/documents/upload", files={"file": ("collide.txt", second, "text/plain")}
+    )
+    assert clash.status_code == 409
+    alpha = client.post("/api/query", json={"query": "What is the Team Alpha budget for 2027?"})
+    assert "1.2" in alpha.json()["answer"]
+
+    # An explicit replace updates it in place.
+    replaced = client.post(
+        "/api/documents/upload?replace=true",
+        files={"file": ("collide.txt", second, "text/plain")},
+    )
+    assert replaced.status_code == 200
+    assert replaced.json()["status"] == "updated"
+    assert replaced.json()["document_id"] == doc_id
+
+    assert client.delete(f"/api/documents/{doc_id}").status_code == 200
+
+
+def test_admin_token_guards_document_changes(client, monkeypatch):
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "admin_token", "s3cret")
+    upload = {
+        "file": ("guarded.txt", b"Guarded document body text for the admin test.", "text/plain")
+    }
+    assert client.post("/api/documents/upload", files=upload).status_code == 401
+    assert client.delete("/api/documents/nope").status_code == 401
+    assert (
+        client.delete("/api/documents/nope", headers={"X-Admin-Token": "s3cret"}).status_code == 404
+    )
+    # Reading and querying stay open.
+    assert client.get("/api/documents").status_code == 200
+    assert client.post("/api/query", json={"query": "What was Q2 revenue?"}).status_code == 200

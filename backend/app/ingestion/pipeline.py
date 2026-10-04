@@ -56,13 +56,25 @@ def _faiss_id_for(chunk_id: str) -> int:
     return int.from_bytes(digest, "big") & 0x7FFFFFFFFFFFFFFF
 
 
+class DocumentConflict(ValueError):
+    """A *different* document already exists under this filename."""
+
+
 def ingest_bytes(
     db: Session,
     *,
     data: bytes,
     filename: str,
     title: str | None = None,
+    replace: bool = False,
 ) -> IngestResult:
+    """Ingest one file.
+
+    Documents are keyed by filename. Re-uploading identical content is a
+    no-op; uploading *different* content under an existing name raises
+    `DocumentConflict` unless `replace=True` - otherwise one user's
+    "report.pdf" would silently overwrite another's.
+    """
     suffix = "." + filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
     if suffix not in SUPPORTED_SUFFIXES:
         raise ValueError(f"Unsupported file type '{suffix}'. Allowed: {sorted(SUPPORTED_SUFFIXES)}")
@@ -81,6 +93,12 @@ def ingest_bytes(
     if document is not None and document.checksum == checksum:
         return IngestResult(
             document.id, document.title, filename, document.chunk_count, "unchanged"
+        )
+
+    if document is not None and not replace:
+        raise DocumentConflict(
+            f"A different document named '{filename}' already exists. "
+            "Rename the file, or re-upload with replace=true to update it."
         )
 
     status = "updated" if document is not None else "created"
@@ -125,15 +143,49 @@ def ingest_bytes(
             )
         )
     document.chunk_count = len(pieces)
-    db.commit()
+    try:
+        db.commit()
+    except Exception:
+        # Keep FAISS and the database in step: vectors for rows that never
+        # committed would be orphans. (Old vectors of a replaced document are
+        # restored by reconcile_vector_store() on the next boot.)
+        db.rollback()
+        store.remove(faiss_ids)
+        raise
     invalidate_bm25()
 
     log.info("Ingested %-30s %-9s %3d chunks", filename, status, len(pieces))
     return IngestResult(document.id, document.title, filename, len(pieces), status)
 
 
+def reconcile_vector_store(db: Session) -> int:
+    """Re-embed any chunk whose vector is missing from the FAISS index.
+
+    The index is a separate file from the database. If it is lost, corrupted
+    or rebuilt empty (e.g. a dimension mismatch on load) while the database
+    survives, ingestion's checksum skip treats every document as "unchanged"
+    and never re-adds the vectors - dense search would stay empty forever.
+    Re-embedding from the stored chunk text restores it without re-uploading.
+    Returns the number of vectors restored.
+    """
+    store = get_vector_store()
+    rows = list(db.execute(select(Chunk.faiss_id, Chunk.content)).all())
+    if not rows:
+        return 0
+    present = store.ids()
+    missing = [(fid, content) for fid, content in rows if fid not in present]
+    if not missing:
+        return 0
+    vectors = get_embedder().embed_documents([content for _, content in missing])
+    store.add(np.array([fid for fid, _ in missing], dtype=np.int64), vectors)
+    log.warning("Restored %d missing vectors into the FAISS index", len(missing))
+    return len(missing)
+
+
 def ingest_file(db: Session, path: Path) -> IngestResult:
-    return ingest_bytes(db, data=path.read_bytes(), filename=path.name)
+    # The seed corpus is the source of truth for its own files, so an edited
+    # seed document replaces its previous version.
+    return ingest_bytes(db, data=path.read_bytes(), filename=path.name, replace=True)
 
 
 def ingest_seed_corpus(db: Session) -> list[IngestResult]:
@@ -151,11 +203,13 @@ def delete_document(db: Session, document_id: str) -> bool:
     document = db.get(Document, document_id)
     if document is None:
         return False
-    store = get_vector_store()
     old_ids = [c.faiss_id for c in document.chunks]
-    if old_ids:
-        store.remove(np.array(old_ids, dtype=np.int64))
+    # Commit the rows first: if that fails nothing changes. A vector left
+    # behind after a failed removal is harmless - retrieval drops FAISS hits
+    # with no matching chunk row.
     db.delete(document)
     db.commit()
+    if old_ids:
+        get_vector_store().remove(np.array(old_ids, dtype=np.int64))
     invalidate_bm25()
     return True

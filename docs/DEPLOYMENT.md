@@ -10,10 +10,12 @@ first stage and served by FastAPI as static files in the second.
    **New → Blueprint** and point it at this repo - it reads `render.yaml` at
    the repo root automatically.
 2. No managed database is provisioned. Documents, chunks and the query log
-   live in SQLite; the vector index is FAISS-on-disk. Both persist on
-   Render's container disk for the life of the service - nothing expires,
+   live in SQLite; the vector index is FAISS-on-disk. Nothing expires,
    unlike Render's free Postgres (30-day expiry on new instances), which
-   this project has no dependency on in the first place.
+   this project has no dependency on in the first place - but the free
+   tier's disk is **ephemeral**: it is wiped on every restart, redeploy or
+   wake from sleep. The seed corpus is re-ingested on boot, so the demo
+   always comes back working; documents you uploaded yourself do not.
 3. Optionally add an `ANTHROPIC_API_KEY` secret in the service's
    **Environment** tab to switch on Claude-generated answers. Nothing else is
    required.
@@ -34,8 +36,11 @@ Only needed if you want the frontend and backend on separate hosts.
    ```
    VITE_API_BASE=https://<your-render-service>.onrender.com
    ```
-3. Vercel's preview/prod domains are already allow-listed in the backend's
-   CORS config (`allow_origin_regex` matches `*.vercel.app`).
+3. Allow your frontend's origin on the backend: set `CORS_ORIGINS` to your
+   production URL and, optionally, `CORS_ORIGIN_REGEX` for your own preview
+   deployments (e.g. `^https://rag-knowledge-platform(-[a-z0-9-]+)?\.vercel\.app$`).
+   The backend no longer trusts every `*.vercel.app` origin by default - that
+   would let any Vercel-hosted site call the API from a visitor's browser.
 
 ## Local: Docker Compose
 
@@ -60,6 +65,8 @@ The ones that matter for a deployment:
 | `GROUNDEDNESS_THRESHOLD` | `0.5` | Below this, the answer is prefixed with a visible low-confidence warning. |
 | `BLOCK_ON_PROMPT_INJECTION` | `true` | Whether a query-level injection match blocks the request outright. |
 | `CORS_ORIGINS` | `localhost:5173` | Comma-separated list; add your frontend's production origin. |
+| `CORS_ORIGIN_REGEX` | *(empty)* | Optional regex for extra origins, e.g. your own Vercel previews. |
+| `ADMIN_TOKEN` | *(empty)* | When set, document upload/delete require an `X-Admin-Token` header (the UI prompts once). Querying stays open. Blank = open demo. |
 | `SEED_ON_STARTUP` | `true` | Re-ingests the bundled demo corpus on every boot (idempotent). |
 
 ## Verifying a deployment

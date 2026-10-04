@@ -56,3 +56,63 @@ def test_rerank_improves_or_preserves_top_result(db):
 
 def test_rerank_handles_empty_candidates():
     assert rerank("anything", [], top_k=5) == []
+
+
+def test_lost_vector_index_is_rebuilt_on_boot(db):
+    """The FAISS file is lost while the database survives (corrupt file,
+    dimension-mismatch rebuild). Seeding skips unchanged documents, so without
+    reconciliation dense search stayed empty and every query returned nothing.
+    """
+    from app.db.init_db import initialise
+    from app.retrieval.vector_store import get_vector_store
+
+    store = get_vector_store()
+    before = store.count
+    assert before > 0
+    store.reset()  # simulate the lost index
+
+    # Even before any repair, lexical search keeps answering.
+    assert retrieve(db, "Q2 2026 revenue growth"), "empty vector index must not disable BM25"
+
+    initialise(seed=True)  # a reboot
+    assert store.count == before
+    assert retrieve(db, "Q2 2026 revenue growth")
+
+
+def test_corpus_version_changes_on_in_place_edit(db):
+    from app.ingestion.pipeline import delete_document, ingest_bytes
+    from app.retrieval.bm25 import _corpus_version
+
+    v0 = _corpus_version(db)
+    doc = ingest_bytes(
+        db, data=b"Bike racks are in the basement level two garage.", filename="bikes.txt"
+    )
+    v1 = _corpus_version(db)
+    ingest_bytes(
+        db,
+        data=b"Bike racks are on the rooftop terrace near the cafe.",
+        filename="bikes.txt",
+        replace=True,
+    )
+    v2 = _corpus_version(db)
+    delete_document(db, doc.document_id)
+    assert len({v0, v1, v2}) == 3
+    assert _corpus_version(db) == v0
+
+
+def test_failed_commit_leaves_no_orphan_vectors(db, monkeypatch):
+    from app.ingestion.pipeline import ingest_bytes
+    from app.retrieval.vector_store import get_vector_store
+
+    store = get_vector_store()
+    before = store.count
+
+    def boom():
+        raise RuntimeError("disk full")
+
+    monkeypatch.setattr(db, "commit", boom)
+    with pytest.raises(RuntimeError):
+        ingest_bytes(
+            db, data=b"This upload never commits to the database at all.", filename="ghost.txt"
+        )
+    assert store.count == before

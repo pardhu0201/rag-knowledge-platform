@@ -6,8 +6,10 @@
 #
 # No managed database: Render's free Postgres now expires 30 days after
 # creation, and this project's vector index is FAISS-on-disk anyway (no
-# Postgres/pgvector dependency at all), so SQLite is the natural, permanent
-# free choice - nothing here expires.
+# Postgres/pgvector dependency at all), so SQLite is the natural free choice -
+# nothing here expires. The free tier's disk is ephemeral, though: it is wiped
+# on every restart, redeploy or wake from sleep. The seed corpus is
+# re-ingested on boot; documents uploaded through the UI are not kept.
 #
 # Render's free web services sleep after 15 minutes of inactivity and take
 # roughly 50 seconds to wake on the next request - expected for a free-tier
