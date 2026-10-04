@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { FileText, Loader2, Trash2, UploadCloud } from "lucide-react";
 
 import { EmptyState, PageHeader } from "../components/primitives";
-import { api, type DocumentSummary } from "../lib/api";
+import { api, ApiError, type DocumentSummary } from "../lib/api";
 
 export default function DocumentsPage() {
   const [documents, setDocuments] = useState<DocumentSummary[]>([]);
@@ -28,7 +28,18 @@ export default function DocumentsPage() {
     setUploading(true);
     setStatus("");
     try {
-      const result = await api.uploadDocument(file);
+      let result;
+      try {
+        result = await api.uploadDocument(file);
+      } catch (err) {
+        // A different document already has this name: ask before replacing it.
+        if (!(err instanceof ApiError && err.status === 409)) throw err;
+        if (!window.confirm(`${err.message}\n\nReplace the existing "${file.name}"?`)) {
+          setStatus("Upload cancelled - the existing document was kept.");
+          return;
+        }
+        result = await api.uploadDocument(file, true);
+      }
       setStatus(`${result.status}: "${result.title}" indexed into ${result.chunks} chunks.`);
       await load();
     } catch (err) {

@@ -2,12 +2,13 @@
 
 A document platform's corpus mutates constantly (uploads, deletes), unlike a
 fixed policy corpus, so the index is keyed by a cheap version fingerprint
-(row count + latest timestamp) and rebuilt lazily on the first search after a
-change rather than on every request.
+(chunk count + a hash of every document's content checksum) and rebuilt
+lazily on the first search after a change rather than on every request.
 """
 
 from __future__ import annotations
 
+import hashlib
 import math
 from collections import Counter
 from dataclasses import dataclass
@@ -69,9 +70,18 @@ _cache: dict[str, BM25Index] = {}
 
 
 def _corpus_version(db: Session) -> str:
+    """Cache key that changes whenever any document is added, edited or removed.
+
+    "Row count + latest created_at" missed in-place edits: re-uploading a
+    document with replace=True keeps its created_at, and often its chunk
+    count, so another worker process would keep serving the stale index. The
+    content checksum changes on every edit, so hashing (id, checksum) pairs
+    catches it everywhere without cross-process signalling.
+    """
+    rows = db.execute(select(Document.id, Document.checksum).order_by(Document.id)).all()
     count = db.execute(select(func.count(Chunk.id))).scalar() or 0
-    latest = db.execute(select(func.max(Document.created_at))).scalar()
-    return f"{count}:{latest}"
+    digest = hashlib.sha1("|".join(f"{i}:{c}" for i, c in rows).encode("utf-8")).hexdigest()
+    return f"{count}:{digest}"
 
 
 def get_index(db: Session) -> BM25Index:

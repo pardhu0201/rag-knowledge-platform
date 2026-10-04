@@ -8,7 +8,7 @@ demo-able corpus and no manual setup step.
 from __future__ import annotations
 
 from app.db.base import Base, engine, session_scope
-from app.ingestion.pipeline import ingest_seed_corpus
+from app.ingestion.pipeline import ingest_seed_corpus, reconcile_vector_store
 from app.logging_config import get_logger
 
 log = get_logger(__name__)
@@ -36,3 +36,6 @@ def initialise(seed: bool = True) -> None:
     create_schema()
     if seed:
         seed_corpus()
+    # Always - uploaded documents need their vectors too, not just the seed set.
+    with session_scope() as db:
+        reconcile_vector_store(db)

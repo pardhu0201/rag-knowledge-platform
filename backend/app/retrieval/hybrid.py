@@ -120,14 +120,17 @@ def retrieve(
 
     bm25_index = get_index(db)
     store = get_vector_store()
-    if not bm25_index.chunk_ids or store.count == 0:
+    if not bm25_index.chunk_ids:
         return []
 
     embedder = get_embedder()
     dense_weight = 0.55 if embedder.name == "hashing" else 1.0
 
     # Dense leg: FAISS returns faiss_id, so resolve to chunk_id via one query.
-    dense_hits_raw = store.search(embedder.embed_query(query), candidates)
+    # An empty index degrades to lexical-only search instead of returning
+    # nothing - the vectors can be missing (lost file, mid-rebuild) while the
+    # chunks and BM25 are perfectly usable.
+    dense_hits_raw = store.search(embedder.embed_query(query), candidates) if store.count else []
     faiss_ids = [fid for fid, _ in dense_hits_raw]
     faiss_to_chunk: dict[int, Chunk] = {}
     if faiss_ids:

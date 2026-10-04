@@ -2,14 +2,15 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.api.security import require_admin
 from app.db.base import get_session
 from app.db.models import Document
 from app.ingestion.extract import SUPPORTED_SUFFIXES
-from app.ingestion.pipeline import delete_document, ingest_bytes
+from app.ingestion.pipeline import DocumentConflict, delete_document, ingest_bytes
 from app.logging_config import get_logger
 from app.schemas import DocumentOut, IngestResponse
 
@@ -36,8 +37,14 @@ def list_documents(db: Session = Depends(get_session)):
     ]
 
 
-@router.post("/documents/upload", response_model=IngestResponse)
-async def upload_document(file: UploadFile = File(...), db: Session = Depends(get_session)):
+@router.post(
+    "/documents/upload", response_model=IngestResponse, dependencies=[Depends(require_admin)]
+)
+async def upload_document(
+    file: UploadFile = File(...),
+    replace: bool = Query(False, description="Overwrite a different document with this name"),
+    db: Session = Depends(get_session),
+):
     name = file.filename or "upload.txt"
     suffix = "." + name.rsplit(".", 1)[-1].lower() if "." in name else ""
     if suffix not in SUPPORTED_SUFFIXES:
@@ -51,7 +58,9 @@ async def upload_document(file: UploadFile = File(...), db: Session = Depends(ge
         raise HTTPException(status_code=413, detail="File larger than 15 MB")
 
     try:
-        result = ingest_bytes(db, data=data, filename=name)
+        result = ingest_bytes(db, data=data, filename=name, replace=replace)
+    except DocumentConflict as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
@@ -64,7 +73,7 @@ async def upload_document(file: UploadFile = File(...), db: Session = Depends(ge
     )
 
 
-@router.delete("/documents/{document_id}")
+@router.delete("/documents/{document_id}", dependencies=[Depends(require_admin)])
 def remove_document(document_id: str, db: Session = Depends(get_session)):
     if not delete_document(db, document_id):
         raise HTTPException(status_code=404, detail="Document not found")

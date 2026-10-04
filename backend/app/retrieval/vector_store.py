@@ -83,6 +83,13 @@ class VectorStore:
     def count(self) -> int:
         return int(self._index.ntotal)
 
+    def ids(self) -> set[int]:
+        """Every id currently in the index (for reconciliation with the DB)."""
+        with self._lock:
+            if self._index.ntotal == 0:
+                return set()
+            return {int(i) for i in faiss.vector_to_array(self._index.id_map)}
+
     def reset(self) -> None:
         with self._lock:
             self._index = faiss.IndexIDMap2(faiss.IndexFlatIP(self.dim))

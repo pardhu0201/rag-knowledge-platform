@@ -6,11 +6,13 @@ inline citations — backed by hybrid retrieval, reranking, and guardrails
 that catch unsupported answers and prompt-injection attempts before they
 reach you.
 
+**[Live demo →](https://rag-knowledge-platform-tgzo.onrender.com)** &nbsp;·&nbsp;
 [![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/pardhu0201/rag-knowledge-platform)
 
-Free (Render's free web-service tier — sleeps after 15 minutes idle, ~50s to
-wake), runs in deterministic extractive mode with no API key, and upgrades
-in place to Claude Opus 5 generation when one is supplied.
+Runs for free (Render's free web-service tier — sleeps after 15 minutes
+idle, ~50s to wake on the next request) in deterministic extractive mode
+with no API key, and upgrades in place to Claude Opus 5 generation when one
+is supplied. Click **Deploy to Render** to spin up your own copy.
 
 ![Ask page — cited answer, live pipeline metrics, groundedness guardrail](docs/screenshots/01-ask.png)
 
@@ -36,11 +38,17 @@ a RAG system that separate a demo from something production-shaped:
   prompt-injection scanner that **blocks outright** when the attack is in the
   user's own query, but only **flags** — never blocks — when it's embedded in
   a retrieved document, because a security-awareness policy that quotes a
-  phishing email should never make the platform unusable.
+  phishing email should never make the platform unusable. Patterns target
+  instructions aimed at the assistant ("ignore *your* instructions"), not
+  topic words, so "what are the instructions for deploying X?" is answered;
+  leetspeak, zero-width characters and Cyrillic look-alikes are normalised
+  away before matching. Both directions are tested — attacks blocked *and*
+  legitimate trigger-word questions let through.
 - **Evaluation against a curated dataset, not vibes** — `backend/evals/` is a
-  22-case golden set scoring retrieval recall/MRR, fact coverage, groundedness,
+  32-case golden set scoring retrieval recall/MRR, fact coverage, groundedness,
   hallucination rate, and — critically — whether prompt-injection attempts
-  were actually blocked and out-of-scope questions actually flagged. CI runs
+  were actually blocked, legitimate questions that *mention* injection
+  vocabulary were never blocked, and out-of-scope questions were flagged. CI runs
   it on every push and fails on regression.
 - **A real cost/latency dashboard** — every query is logged with per-stage
   timing (retrieval / rerank / generation) and an estimated dollar cost from
@@ -90,7 +98,7 @@ are in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 | Guardrails | Deterministic groundedness scoring + regex-based prompt-injection detection |
 | Database | SQLite (documents, chunks metadata, query log) |
 | Frontend | **React 19**, TypeScript, Tailwind v4, Vite |
-| Tests / evals | pytest (36 tests), a 22-case golden-set eval harness, ruff |
+| Tests / evals | pytest (68 tests), a 32-case golden-set eval harness, ruff |
 | CI/CD | GitHub Actions — lint, tests, evals, full Docker boot-and-healthcheck |
 | Deployment | Single Docker image — free-tier ready on Render |
 
@@ -135,7 +143,7 @@ npm run dev    # http://localhost:5173, proxies /api to :8000
 
 ```bash
 cd backend
-pytest -q                     # 36 tests: ingestion, retrieval, guardrails, API
+pytest -q                     # 68 tests: ingestion, retrieval, guardrails, API
 python -m evals.run_eval      # retrieval/groundedness/guardrail scorecard
 ```
 
@@ -163,8 +171,8 @@ backend/
     api/             # FastAPI routers
     pipeline.py      # ties every stage together, timed and logged
   data/seed_corpus/  # 4 seed documents (revenue report, tech spec, vendor assessment, security guideline)
-  evals/             # 22-case golden-set evaluation harness
-  tests/             # 36 pytest tests
+  evals/             # 32-case golden-set evaluation harness
+  tests/             # 68 pytest tests
 frontend/
   src/
     pages/           # Ask, Documents, Dashboard
